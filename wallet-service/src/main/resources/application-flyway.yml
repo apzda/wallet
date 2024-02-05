@@ -1,0 +1,6 @@
+spring:
+  flyway:
+    create-schemas: false
+    locations: classpath:db/migration/{vendor}
+  jpa:
+    open-in-view: false
