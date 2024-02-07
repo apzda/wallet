@@ -14,29 +14,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.apzda.cloud.wallet.server;
+package com.apzda.cloud.wallet.domain.mapper;
 
-import com.apzda.cloud.wallet.config.WalletConfig;
-import com.apzda.cloud.wallet.proto.WalletServiceGsvc;
-import org.mybatis.spring.annotation.MapperScan;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.PropertySource;
-
-import java.lang.annotation.*;
+import com.apzda.cloud.wallet.domain.entity.Outlay;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**
  * @author fengz (windywany@gmail.com)
  * @version 1.0.0
  * @since 1.0.0
  **/
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-@PropertySource("classpath:apzda.wallet.service.properties")
-@Import({ WalletConfig.class, WalletServiceGsvc.class })
-@ComponentScan(basePackages = { "com.apzda.cloud.wallet.**.service" })
-@MapperScan(basePackages = { "com.apzda.cloud.wallet.domain.mapper" })
-@Documented
-public @interface EnableWalletServer {
+public interface OutlayMapper extends BaseMapper<Outlay> {
 
 }

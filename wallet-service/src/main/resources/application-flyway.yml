@@ -1,6 +1,6 @@
 spring:
   flyway:
-    create-schemas: false
     locations: classpath:db/migration/{vendor}
-  jpa:
-    open-in-view: false
+    out-of-order: true
+  config:
+    import: classpath:apzda.wallet.service.properties

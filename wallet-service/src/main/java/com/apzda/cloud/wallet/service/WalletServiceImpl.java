@@ -16,8 +16,14 @@
  */
 package com.apzda.cloud.wallet.service;
 
+import com.apzda.cloud.wallet.proto.TradeDTO;
+import com.apzda.cloud.wallet.proto.TransactionVO;
+import com.apzda.cloud.wallet.proto.WalletDTO;
 import com.apzda.cloud.wallet.proto.WalletService;
+import lombok.RequiredArgsConstructor;
+import lombok.val;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * @author fengz (windywany@gmail.com)
@@ -25,6 +31,25 @@ import org.springframework.stereotype.Service;
  * @since 1.0.0
  **/
 @Service
+@RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
+
+    private com.apzda.cloud.wallet.domain.service.WalletService walletService;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TransactionVO trade(TradeDTO request) {
+        val wallet = walletService.openWallet(request.getUid(), request.getCurrency());
+        val transaction = wallet.newTransaction(request);
+
+        walletService.trade(wallet, transaction);
+
+        return null;
+    }
+
+    @Override
+    public WalletDTO wallet(WalletDTO request) {
+        return null;
+    }
 
 }

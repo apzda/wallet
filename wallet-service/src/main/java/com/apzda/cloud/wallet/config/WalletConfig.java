@@ -16,7 +16,17 @@
  */
 package com.apzda.cloud.wallet.config;
 
+import com.apzda.mybatis.plus.configure.MybatisCustomizer;
+import lombok.val;
+import org.springframework.beans.BeansException;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
+
+import java.util.Set;
 
 /**
  * @author fengz (windywany@gmail.com)
@@ -24,6 +34,43 @@ import org.springframework.context.annotation.Configuration;
  * @since 1.0.0
  **/
 @Configuration
-public class WalletConfig {
+@EnableConfigurationProperties(WalletProperties.class)
+public class WalletConfig implements ApplicationContextAware {
+
+    private static WalletProperties properties;
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        properties = applicationContext.getBean(WalletProperties.class);
+    }
+
+    @NonNull
+    public static WalletProperties.CurrencyConfig getCurrencyConfig(String currency) {
+        if (properties == null) {
+            throw new IllegalStateException("Cannot get Currency Configuration before WalletConfig Bean initialized!");
+        }
+        val currencyConfig = properties.getCurrency().get(currency);
+        if (currencyConfig == null) {
+            throw new IllegalStateException("Configuration of '" + currency + "' not found, please configure it");
+        }
+        return currencyConfig;
+    }
+
+    @Bean
+    MybatisCustomizer mybatisCustomizer() {
+        return new MybatisCustomizer() {
+            @Override
+            public void addLocation(@NonNull Set<String> locations) {
+                locations.add("classpath*:/com/apzda/cloud/**/*Mapper.xml");
+            }
+
+            @Override
+            public void addTenantIgnoreTable(@NonNull Set<String> tables) {
+                tables.add("wallet");
+                tables.add("wallet_transaction");
+                tables.add("wallet_outlay_log");
+            }
+        };
+    }
 
 }
