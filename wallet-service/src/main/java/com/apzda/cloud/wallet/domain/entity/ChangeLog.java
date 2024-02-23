@@ -18,6 +18,7 @@ package com.apzda.cloud.wallet.domain.entity;
 
 import cn.hutool.crypto.digest.MD5;
 import com.baomidou.mybatisplus.annotation.*;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -97,6 +98,10 @@ public class ChangeLog implements Serializable {
     private Long expiredAt;
 
     @NotNull
+    @Min(0)
+    private Long parentId;
+
+    @NotNull
     private String ip;
 
     @NotNull
@@ -133,6 +138,7 @@ public class ChangeLog implements Serializable {
         changelog.bizId = String.valueOf(wallet.getId());
         changelog.ip = "127.0.0.1";
         changelog.remark = "Initialize";
+        changelog.parentId = 0L;
         changelog.block = genBlock(changelog, wallet.getBlock());
         return changelog;
     }
@@ -159,6 +165,7 @@ public class ChangeLog implements Serializable {
             + changeLog.preFrozen+","
             + changeLog.frozen+","
             + changeLog.expiredAt+","
+            + changeLog.parentId+","
             + changeLog.ip;
         // @formatter:on
 

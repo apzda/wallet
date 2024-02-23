@@ -140,11 +140,6 @@ public class WalletProperties {
         private boolean withdrawAble = false;
 
         /**
-         * 该业务可增加用户的余额
-         */
-        private boolean income = true;
-
-        /**
          * 该业务可支出用户的余额
          */
         private boolean outlay = true;

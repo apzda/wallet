@@ -38,7 +38,7 @@ public class Transaction implements Serializable {
     @Serial
     private static final long serialVersionUID = -5787777442476314765L;
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     @TableField(fill = FieldFill.INSERT)

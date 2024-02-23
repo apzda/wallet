@@ -16,15 +16,38 @@ apzda:
           precision: 8
           scale: 2
           biz:
-            deposit:
-              name: 充值
+            test:
+              name: 测试业务线
               subjects:
                 deposit:
                   name: 充值
+                  outlay: false
                   withdraw-able: true
-
-
-
+                earn:
+                  name: 任务
+                  outlay: false
+                withdraw:
+                  name: 提现
+                  need-frozen: true
+                  withdraw-able: true
+                pay:
+                  name: 支付
+                  need-frozen: false
+                  withdraw-able: false
+        INT:
+          name: 金豆子
+          precision: 0
+          scale: 0
+          enabled-expire: true
+          biz:
+            test:
+              name: 测试业务线
+              subjects:
+                add:
+                  name: 新增
+                  outlay: false
+                sub:
+                  name: 消耗
 logging:
   level:
     com.apzda.cloud.wallet: debug

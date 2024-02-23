@@ -13,11 +13,11 @@ message TradeDTO {
   uint64 uid = 1 [(buf.validate.field).uint64.gt = 0];
   string currency = 2 [(buf.validate.field).required = true];
   double amount = 3 [(buf.validate.field).double.gt = 0];
-  bool outlay = 4;
-  string biz = 5;
-  string biz_subject = 6;
-  string biz_id = 7;
-  optional uint64 expired_at = 8;
+  string biz = 4 [(buf.validate.field).required = true];
+  string biz_subject = 5 [(buf.validate.field).required = true];
+  string biz_id = 6 [(buf.validate.field).required = true];
+  optional uint64 expired_at = 7;
+  optional string remark = 8;
 }
 
 message TransactionVO {
@@ -29,7 +29,8 @@ message TransactionVO {
   string biz_subject = 6;
   string biz_id = 7;
   uint64 expired_at = 8;
-
+  uint32 scale = 9;
+  uint32 precision = 10;
 }
 
 message WalletDTO {

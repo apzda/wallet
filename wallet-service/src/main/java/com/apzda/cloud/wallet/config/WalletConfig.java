@@ -49,10 +49,25 @@ public class WalletConfig implements ApplicationContextAware {
         if (properties == null) {
             throw new IllegalStateException("Cannot get Currency Configuration before WalletConfig Bean initialized!");
         }
+
         val currencyConfig = properties.getCurrency().get(currency);
+
         if (currencyConfig == null) {
             throw new IllegalStateException("Configuration of '" + currency + "' not found, please configure it");
         }
+
+        if (currencyConfig.isEnabledExpire()) {
+            val defaultExpireSubject = new WalletProperties.BizSubject();
+            defaultExpireSubject.setName("expire");
+            val bizConfig = currencyConfig.getBiz().getOrDefault("system", new WalletProperties.BizConfig());
+            val expire = bizConfig.getSubjects().getOrDefault("expire", defaultExpireSubject);
+            expire.setOutlay(true);
+            expire.setNeedFrozen(false);
+            expire.setWithdrawAble(false);
+            bizConfig.getSubjects().put("expire", expire);
+            currencyConfig.getBiz().put("system", bizConfig);
+        }
+
         return currencyConfig;
     }
 

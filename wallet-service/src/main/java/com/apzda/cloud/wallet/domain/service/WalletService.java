@@ -23,6 +23,7 @@ import com.apzda.cloud.wallet.domain.entity.Transaction;
 import com.apzda.cloud.wallet.domain.entity.Wallet;
 import com.apzda.cloud.wallet.domain.mapper.WalletMapper;
 import com.apzda.cloud.wallet.error.WalletError;
+import com.apzda.cloud.wallet.proto.TradeDTO;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,8 @@ public class WalletService extends ServiceImpl<WalletMapper, Wallet> {
     private final TransactionService transactionService;
 
     private final ChangeLogService changeLogService;
+
+    private final OutlayService outlayService;
 
     @Transactional(rollbackFor = Exception.class)
     public synchronized Wallet openWallet(@NonNull Long uid, @NonNull String currency) {
@@ -91,22 +94,21 @@ public class WalletService extends ServiceImpl<WalletMapper, Wallet> {
         if (wallet == null) {
             WalletError.NOTFOUND.emit(uid, currency);
         }
-
+        if (wallet.isLocked()) {
+            log.error("Wallet(uid: {}, currency: {}) is locked!", uid, currency);
+            WalletError.LOCKED.emit(wallet);
+        }
         return wallet;
     }
 
     @Transactional(rollbackFor = Exception.class)
     @Valid
-    public Transaction trade(@NonNull final Wallet wallet, @NonNull final Transaction transaction) {
-        transaction.setUid(wallet.getUid());
-        val uid = transaction.getUid();
-        transaction.setCurrency(wallet.getCurrency());
-        val currency = transaction.getCurrency();
-
-        if (wallet.isLocked()) {
-            log.error("Wallet(uid: {}, currency: {}) is locked!", uid, currency);
-            WalletError.LOCKED.emit(wallet);
-        }
+    public Transaction trade(TradeDTO tradeDTO) {
+        val uid = tradeDTO.getUid();
+        val currency = tradeDTO.getCurrency();
+        // 打开用户钱包
+        val wallet = openWallet(uid, currency);
+        val transaction = wallet.newTransaction(tradeDTO);
 
         val lastLog = getLastLog(wallet);
         // 完整性校验
@@ -114,30 +116,68 @@ public class WalletService extends ServiceImpl<WalletMapper, Wallet> {
             log.error("Wallet(uid: {}, currency: {}) change log not found!", uid, currency);
             WalletError.INTEGRITY_FAILED.emit(wallet);
         }
+
         if (!lastLog.getBlock().equals(wallet.getBlock())) {
             log.error("Wallet(uid: {}, currency: {}) integrity verification failed: log block({}) != wallet block({})",
                     uid, currency, lastLog.getBlock(), wallet.getBlock());
             WalletError.INTEGRITY_FAILED.emit(wallet);
         }
 
-        // 钱包未开启过期机制
+        // 钱包未开启过期机制时将交易的过期时间置为null。
         if (!wallet.isExpireAble()) {
             transaction.setExpiredAt(null);
         }
-        //
-
-        ChangeLog changeLog = wallet.newChangeLog(transaction);
-
-        changeLog.genBlock(wallet.getBlock());
-        if (!changeLogService.save(changeLog)) {
-
+        else if (transaction.getExpiredAt() == null
+                || DateUtil.date(transaction.getExpiredAt()).isBefore(DateUtil.date())) {
+            WalletError.EXPIRED_TIME_INVALID.emit(wallet);
         }
-        return null;
+        // 保存交易记录
+        if (!transactionService.save(transaction)) {
+            WalletError.TRADE_CANNOT_SAVE.emit(wallet);
+        }
+
+        //
+        if (wallet.isExpireAble()) {
+            if (transaction.isOutlay()) {
+                outlayService.outlay(transaction);
+            }
+            else {
+                outlayService.newIncome(transaction);
+            }
+        }
+
+        // 生成交易日志
+        ChangeLog changeLog = wallet.newChangeLog(transaction, lastLog);
+
+        if (!changeLogService.save(changeLog)) {
+            WalletError.LOG_CANNOT_SAVE.emit(wallet);
+        }
+        // 更新账户
+        if (!updateById(wallet)) {
+            WalletError.WALLET_CANNOT_UPDATE.emit(wallet);
+        }
+
+        return transaction;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public boolean confirm(Long transactionId) {
+        // 用于确认
+        return false;
+    }
+
+    public boolean rollback(Long transactionId) {
+        return false;
     }
 
     @Nullable
     public ChangeLog getLastLog(@NonNull Wallet wallet) {
         return changeLogService.getLastLog(wallet.getUid(), wallet.getCurrency());
+    }
+
+    @Nullable
+    public ChangeLog getLastLog(@NonNull long uid, @NonNull String currency) {
+        return changeLogService.getLastLog(uid, currency);
     }
 
 }

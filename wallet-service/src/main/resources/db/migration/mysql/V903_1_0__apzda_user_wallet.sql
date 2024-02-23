@@ -42,6 +42,7 @@ CREATE TABLE wallet_change_log
     need_frozen    TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '是否冻结金额',
     withdraw_able  TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '是否可提现：0-不可提现；1-可提现',
     expired_at     BIGINT UNSIGNED  NULL     DEFAULT NULL COMMENT '过期时间',
+    parent_id      BIGINT UNSIGNED  NOT NULL COMMENT '上条记录ID',
     ip             VARCHAR(256)     NOT NULL COMMENT '业务发生时的IP',
     block          VARCHAR(32)      NOT NULL COMMENT 'MD5值,区块地址(基于上一个交易的区块地址)',
     remark         TEXT             NULL     DEFAULT NULL COMMENT '说明',

@@ -38,7 +38,14 @@ public enum WalletError {
     INTEGRITY_FAILED(90302, "Integrity Verification Failed"),
     BIZ_SUBJECT_NOT_FOUND(90303,"biz subject not found"),
     OUTLAY_NOT_ALLOWED(90304,"outlay is not allowed"),
-    INCOME_NOT_ALLOWED(90305,"income is not allowed")
+    INCOME_NOT_ALLOWED(90305,"income is not allowed"),
+    TRADE_CANNOT_SAVE(90306,"transaction can not be saved"),
+    LOG_CANNOT_SAVE(90307,"chang log can not be saved"),
+    WALLET_CANNOT_UPDATE(30908,"wallet cannot be updated"),
+    INSUFFICIENT_BALANCE(90309,"balance is not enough"),
+    INSUFFICIENT_BALANCE1(90310,"withdrawal is not enough"),
+    EXPIRED_TIME_INVALID(90310,"expire time is invalid"),
+    OUTLAY_CANNOT_SAVE(90311,"outlay log cannot be saved")
     ;
     // @formatter:on
 

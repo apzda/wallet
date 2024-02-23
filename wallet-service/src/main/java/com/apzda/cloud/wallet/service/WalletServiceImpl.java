@@ -34,17 +34,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
-    private com.apzda.cloud.wallet.domain.service.WalletService walletService;
+    private final com.apzda.cloud.wallet.domain.service.WalletService walletService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TransactionVO trade(TradeDTO request) {
-        val wallet = walletService.openWallet(request.getUid(), request.getCurrency());
-        val transaction = wallet.newTransaction(request);
 
-        walletService.trade(wallet, transaction);
 
-        return null;
+        val trans = walletService.trade(request);
+        val builder = TransactionVO.newBuilder();
+
+        return builder.build();
     }
 
     @Override

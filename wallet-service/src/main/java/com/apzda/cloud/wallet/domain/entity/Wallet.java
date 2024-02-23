@@ -17,6 +17,7 @@
 package com.apzda.cloud.wallet.domain.entity;
 
 import cn.hutool.core.date.DateUtil;
+import com.apzda.cloud.gsvc.core.GsvcContextHolder;
 import com.apzda.cloud.wallet.config.WalletConfig;
 import com.apzda.cloud.wallet.config.WalletProperties;
 import com.apzda.cloud.wallet.error.WalletError;
@@ -25,11 +26,14 @@ import com.baomidou.mybatisplus.annotation.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.val;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.lang.NonNull;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 
 /**
  * @author fengz (windywany@gmail.com)
@@ -111,16 +115,71 @@ public class Wallet implements Serializable {
         return config.isWithdrawAble();
     }
 
-    public ChangeLog newChangeLog(@NonNull Transaction transaction) {
+    public ChangeLog newChangeLog(@NonNull Transaction transaction, ChangeLog lastLog) {
         val amount = transaction.getAmount();
+        val outlay = transaction.isOutlay();
+        val withdrawAble = transaction.isWithdrawAble();
+        val needFrozen = transaction.isNeedFrozen();
+
         val changeLog = new ChangeLog();
         changeLog.setUid(transaction.getUid());
         changeLog.setCurrency(transaction.getCurrency());
+        changeLog.setParentId(lastLog.getId());
+        changeLog.setTransactionId(transaction.getId());
+        changeLog.setBiz(transaction.getBiz());
+        changeLog.setBizSubject(transaction.getBizSubject());
+        changeLog.setBizId(transaction.getBizId());
+        changeLog.setIp(transaction.getIp());
+        changeLog.setRemark(transaction.getRemark());
+        changeLog.setAmount(amount);// 交易金额
+        changeLog.setPreBalance(lastLog.getBalance());// 交易前余额
+        changeLog.setPreFrozen(lastLog.getFrozen());// 交易前冻结金额
+        changeLog.setOutlay(outlay);
+        changeLog.setNeedFrozen(needFrozen);
+        changeLog.setWithdrawAble(withdrawAble);
+        changeLog.setExpiredAt(transaction.getExpiredAt());
+
+        // 1. 检测交易
+        if (outlay) {
+            // 支出
+            changeLog.setBalance(lastLog.getBalance() - amount);
+            if (changeLog.getBalance() < 0) {
+                WalletError.INSUFFICIENT_BALANCE.emit(this);
+            }
+
+            if (withdrawAble && this.withdrawal - amount < 0) {
+                WalletError.INSUFFICIENT_BALANCE1.emit(this);
+            }
+            this.withdrawal = Math.max(0, this.withdrawal - amount);
+
+            if (needFrozen) { // 冻结
+                changeLog.setFrozen(lastLog.getFrozen() + amount);
+            }
+            else {
+                changeLog.setFrozen(lastLog.getFrozen());
+            }
+
+            this.outlay = this.outlay + amount;
+        }
+        else {
+            // 收入
+            changeLog.setBalance(lastLog.getBalance() + amount);
+            if (withdrawAble) {// 可提现
+                this.withdrawal = this.withdrawal + amount;
+            }
+            changeLog.setFrozen(lastLog.getFrozen());
+        }
+
+        changeLog.genBlock(lastLog.getBlock());
+        this.balance = changeLog.getBalance();
+        this.frozen = changeLog.getFrozen();
+        this.amount = this.balance + this.frozen;
+        this.block = changeLog.getBlock();
         return changeLog;
     }
 
     public Transaction newTransaction(@NonNull TradeDTO tradeDTO) {
-        if (uid != tradeDTO.getUid() || currency.equals(tradeDTO.getCurrency())) {
+        if (uid != tradeDTO.getUid() || !currency.equals(tradeDTO.getCurrency())) {
             WalletError.TRADE_NOT_ALLOWED.emit(this);
         }
         val config = WalletConfig.getCurrencyConfig(currency);
@@ -128,36 +187,47 @@ public class Wallet implements Serializable {
         WalletProperties.BizSubject bizSubject = config.getBizSubject(currency, tradeDTO.getBiz(),
                 tradeDTO.getBizSubject());
 
-        val outlay = tradeDTO.getOutlay();
-        if (outlay && !bizSubject.isOutlay()) {
-            WalletError.OUTLAY_NOT_ALLOWED.emit(this);
-        }
-        if (!outlay && !bizSubject.isIncome()) {
-            WalletError.INCOME_NOT_ALLOWED.emit(this);
-        }
+        val outlay = bizSubject.isOutlay();
         val transaction = new Transaction();
         val current = DateUtil.current();
         transaction.setCreatedAt(current);
         transaction.setUpdatedAt(current);
         transaction.setUid(uid);
         transaction.setCurrency(currency);
-        val amount = BigDecimal.valueOf(tradeDTO.getAmount())
-            .multiply(BigDecimal.valueOf(getPrecision()))
-            .toBigInteger()
-            .longValue();
+        val amount = longValue(tradeDTO.getAmount());
         transaction.setAmount(amount);
         transaction.setOutlay(outlay);
         transaction.setBizId(tradeDTO.getBizId());
         transaction.setBiz(tradeDTO.getBiz());
         transaction.setBizSubject(tradeDTO.getBizSubject());
+        transaction.setIp(GsvcContextHolder.getRemoteIp());
+
         if (outlay) {// 支出判断是否需要冻结
             transaction.setNeedFrozen(bizSubject.isNeedFrozen());
         }
-        else {
-            // 收入判断是否可以提现
-            transaction.setWithdrawAble(bizSubject.isWithdrawAble());
+
+        // 特别注意：提现时withdrawAble应为true。
+        transaction.setWithdrawAble(bizSubject.isWithdrawAble());
+
+        if (tradeDTO.hasExpiredAt()) {
+            transaction.setExpiredAt(tradeDTO.getExpiredAt());
+        }
+        if (tradeDTO.hasRemark()) {
+            transaction.setRemark(tradeDTO.getRemark());
         }
         return transaction;
+    }
+
+    public long longValue(double amount) {
+        val pre = StringUtils.rightPad("1", getPrecision() + 1, "0");
+        return BigDecimal.valueOf(amount).multiply(BigDecimal.valueOf(Long.parseLong(pre))).toBigInteger().longValue();
+    }
+
+    public double doubleValue(long amount) {
+        val pre = StringUtils.rightPad("1", getPrecision() + 1, "0");
+        return BigDecimal.valueOf(amount)
+            .divide(BigDecimal.valueOf(Long.parseLong(pre)), new MathContext(getPrecision(), RoundingMode.DOWN))
+            .doubleValue();
     }
 
 }
