@@ -17,6 +17,7 @@
 package com.apzda.cloud.wallet.domain.service;
 
 import cn.hutool.core.date.DateUtil;
+import com.apzda.cloud.gsvc.core.GsvcContextHolder;
 import com.apzda.cloud.wallet.config.WalletConfig;
 import com.apzda.cloud.wallet.domain.entity.ChangeLog;
 import com.apzda.cloud.wallet.domain.entity.Transaction;
@@ -34,6 +35,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Objects;
 
 /**
  * @author fengz (windywany@gmail.com)
@@ -111,17 +114,8 @@ public class WalletService extends ServiceImpl<WalletMapper, Wallet> {
         val transaction = wallet.newTransaction(tradeDTO);
 
         val lastLog = getLastLog(wallet);
-        // 完整性校验
-        if (lastLog == null) {
-            log.error("Wallet(uid: {}, currency: {}) change log not found!", uid, currency);
-            WalletError.INTEGRITY_FAILED.emit(wallet);
-        }
 
-        if (!lastLog.getBlock().equals(wallet.getBlock())) {
-            log.error("Wallet(uid: {}, currency: {}) integrity verification failed: log block({}) != wallet block({})",
-                    uid, currency, lastLog.getBlock(), wallet.getBlock());
-            WalletError.INTEGRITY_FAILED.emit(wallet);
-        }
+        checkIntegrity(lastLog, wallet);
 
         // 钱包未开启过期机制时将交易的过期时间置为null。
         if (!wallet.isExpireAble()) {
@@ -162,12 +156,124 @@ public class WalletService extends ServiceImpl<WalletMapper, Wallet> {
 
     @Transactional(rollbackFor = Exception.class)
     public boolean confirm(Long transactionId) {
-        // 用于确认
-        return false;
+        // 用于确认冻结
+        val trans = transactionService.getById(transactionId);
+        if (trans == null || !trans.isOutlay() || !trans.isNeedFrozen()) {
+            return false;
+        }
+        val uid = trans.getUid();
+        val currency = trans.getCurrency();
+        val wallet = openWallet(uid, currency);
+
+        val lastLog = getLastLog(wallet);
+
+        checkIntegrity(lastLog, wallet);
+
+        val amount = trans.getAmount();
+        val frozen = wallet.getFrozen();
+        if (amount > frozen || !frozen.equals(Objects.requireNonNull(lastLog).getFrozen())) {
+            WalletError.FROZEN_AMOUNT_INVALID.emit(wallet);
+        }
+
+        val changeLog = new ChangeLog();
+        changeLog.setTransactionId(transactionId);
+        changeLog.setUid(uid);
+        changeLog.setCurrency(currency);
+        changeLog.setBiz("system");
+        changeLog.setBizSubject("confirm");
+        changeLog.setBizId(transactionId.toString());
+        changeLog.setAmount(amount);
+        changeLog.setPreBalance(wallet.getBalance());
+        changeLog.setBalance(wallet.getBalance());
+        changeLog.setPreFrozen(frozen);
+        changeLog.setFrozen(frozen - amount);
+        changeLog.setParentId(lastLog.getId());
+        changeLog.setIp(GsvcContextHolder.getRemoteIp());
+        // changeLog.setRemark("confirm frozen amount");
+        changeLog.genBlock(wallet.getBlock());
+
+        // 扣减冻结金额
+        wallet.setFrozen(changeLog.getFrozen());
+        // 重新计算总余额
+        wallet.setAmount(wallet.getBalance() + wallet.getFrozen());
+        // 更新区块
+        wallet.setBlock(changeLog.getBlock());
+
+        if (!updateById(wallet)) {
+            WalletError.WALLET_CANNOT_UPDATE.emit(wallet);
+        }
+
+        if (!changeLogService.save(changeLog)) {
+            WalletError.LOG_CANNOT_SAVE.emit(wallet);
+        }
+
+        return true;
     }
 
-    public boolean rollback(Long transactionId) {
-        return false;
+    @Transactional(rollbackFor = Exception.class)
+    public boolean unfreeze(Long transactionId) {
+        // 用于返还冻结金额
+        val trans = transactionService.getById(transactionId);
+        if (trans == null || !trans.isOutlay() || !trans.isNeedFrozen()) {
+            return false;
+        }
+        val uid = trans.getUid();
+        val currency = trans.getCurrency();
+        val wallet = openWallet(uid, currency);
+        val lastLog = getLastLog(wallet);
+        checkIntegrity(lastLog, wallet);
+
+        val amount = trans.getAmount();
+        val frozen = wallet.getFrozen();
+        if (amount > frozen || !frozen.equals(Objects.requireNonNull(lastLog).getFrozen())) {
+            WalletError.FROZEN_AMOUNT_INVALID.emit(wallet);
+        }
+        // 这里要弄一个交易（系统交易 - ）
+        val transaction = new Transaction();
+        transaction.setUid(uid);
+        transaction.setCurrency(currency);
+        transaction.setAmount(trans.getAmount());
+        transaction.setWithdrawAble(trans.isWithdrawAble());
+        transaction.setIp(GsvcContextHolder.getRemoteIp());
+        transaction.setBiz("system");
+        transaction.setBizSubject("unfreeze");
+        transaction.setBizId(transactionId.toString());
+        if (!transactionService.save(transaction)) {
+            WalletError.TRADE_CANNOT_SAVE.emit(wallet);
+        }
+        // 记录日志
+        val changeLog = new ChangeLog();
+        changeLog.setTransactionId(transaction.getId());
+        changeLog.setUid(uid);
+        changeLog.setCurrency(currency);
+        changeLog.setBiz("system");
+        changeLog.setBizSubject("unfreeze");
+        changeLog.setBizId(transactionId.toString());
+        changeLog.setAmount(amount);
+        changeLog.setPreBalance(lastLog.getBalance());
+        changeLog.setBalance(lastLog.getBalance() + amount);
+        changeLog.setPreFrozen(frozen);
+        changeLog.setFrozen(frozen - amount);
+        changeLog.setParentId(lastLog.getId());
+        changeLog.setIp(GsvcContextHolder.getRemoteIp());
+        changeLog.genBlock(wallet.getBlock());
+        if (!changeLogService.save(changeLog)) {
+            WalletError.LOG_CANNOT_SAVE.emit(wallet);
+        }
+
+        wallet.setBlock(changeLog.getBlock());
+        wallet.setBalance(changeLog.getBalance());
+        wallet.setFrozen(changeLog.getFrozen());
+        wallet.setAmount(changeLog.getBalance() + changeLog.getFrozen());
+        if (trans.isWithdrawAble()) {
+            wallet.setWithdrawal(wallet.getWithdrawal() + amount);
+        }
+        wallet.setOutlay(wallet.getOutlay() - amount);
+        if (!updateById(wallet)) {
+            WalletError.WALLET_CANNOT_UPDATE.emit(wallet);
+        }
+
+        return true;
     }
 
     @Nullable
@@ -178,6 +284,45 @@ public class WalletService extends ServiceImpl<WalletMapper, Wallet> {
     @Nullable
     public ChangeLog getLastLog(@NonNull long uid, @NonNull String currency) {
         return changeLogService.getLastLog(uid, currency);
+    }
+
+    public static void checkIntegrity(ChangeLog lastLog, Wallet wallet) {
+        val uid = wallet.getUid();
+        val currency = wallet.getCurrency();
+
+        // 完整性校验
+        if (lastLog == null) {
+            log.error("Wallet(uid: {}, currency: {}) change log not found!", uid, currency);
+            WalletError.INTEGRITY_FAILED.emit(wallet);
+        }
+
+        if (!lastLog.getBlock().equals(wallet.getBlock())) {
+            log.error("Wallet(uid: {}, currency: {}) integrity verification failed: log block({}) != wallet block({})",
+                    uid, currency, lastLog.getBlock(), wallet.getBlock());
+            WalletError.INTEGRITY_FAILED.emit(wallet);
+        }
+
+        val balance = lastLog.getBalance();
+        val balance1 = wallet.getBalance();
+        if (!balance.equals(balance1)) {
+            log.error(
+                    "Wallet(uid: {}, currency: {}) integrity verification failed: log balance({}) != wallet balance({})",
+                    uid, currency, lastLog.getBalance(), wallet.getBalance());
+            WalletError.INTEGRITY_FAILED.emit(wallet);
+        }
+
+        if (!lastLog.getFrozen().equals(wallet.getFrozen())) {
+            log.error(
+                    "Wallet(uid: {}, currency: {}) integrity verification failed: log frozen({}) != wallet frozen({})",
+                    uid, currency, lastLog.getFrozen(), wallet.getFrozen());
+            WalletError.INTEGRITY_FAILED.emit(wallet);
+        }
+
+        if (!wallet.getAmount().equals(wallet.getBalance() + wallet.getFrozen())) {
+            log.error(
+                    "Wallet(uid: {}, currency: {}) integrity verification failed: amount{}) != balance({})+frozen({})",
+                    uid, currency, wallet.getAmount(), wallet.getBalance(), wallet.getFrozen());
+        }
     }
 
 }

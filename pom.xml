@@ -7,7 +7,7 @@
     <parent>
         <artifactId>apzda-cloud-gsvc-parent</artifactId>
         <groupId>com.apzda.cloud</groupId>
-        <version>1.2.8-SNAPSHOT</version>
+        <version>1.2.8</version>
     </parent>
 
     <artifactId>wallet</artifactId>
@@ -21,7 +21,7 @@
     </modules>
 
     <properties>
-        <apzda.config.version>1.0.5-SNAPSHOT</apzda.config.version>
+        <apzda.config.version>1.0.5</apzda.config.version>
     </properties>
 
     <issueManagement>

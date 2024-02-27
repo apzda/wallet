@@ -442,4 +442,202 @@ class WalletServiceTest {
         }
     }
 
+    @Test
+    void confirm() {
+        // given
+        val uid = 1L;
+        val currency = "CNY";
+        val builder = TradeDTO.newBuilder();
+        builder.setUid(uid);
+        builder.setCurrency(currency);
+        builder.setBiz("test");
+        // 充值
+        {
+            builder.setAmount(10.25D);
+            builder.setBizSubject("deposit");
+            builder.setBizId("10000");
+            // when 充值
+            val trans = walletService.trade(builder.build());
+            val lastLog = walletService.getLastLog(uid, currency);
+            val wallet = walletService.openWallet(uid, currency);
+
+            // then
+            assertThat(trans).isNotNull();
+            assertThat(trans.getAmount()).isEqualTo(1025000000L);
+            assertThat(trans.isOutlay()).isFalse();
+
+            assertThat(lastLog).isNotNull();
+            assertThat(lastLog.getAmount()).isEqualTo(1025000000L);
+            assertThat(lastLog.getPreBalance()).isEqualTo(0L);
+            assertThat(lastLog.getBalance()).isEqualTo(1025000000L);
+            assertThat(lastLog.getPreFrozen()).isEqualTo(0);
+            assertThat(lastLog.getFrozen()).isEqualTo(0);
+
+            assertThat(wallet.getBalance()).isEqualTo(1025000000L);
+            assertThat(wallet.getFrozen()).isEqualTo(0L);
+            assertThat(wallet.getAmount()).isEqualTo(1025000000L);
+            assertThat(wallet.getWithdrawal()).isEqualTo(1025000000L);
+            assertThat(wallet.getOutlay()).isEqualTo(0L);
+        }
+        // 提现 - 提现完成
+        {
+            // given
+            builder.setAmount(0.05D);
+            builder.setBizSubject("withdraw");
+            builder.setBizId("10001");
+            // when
+            val t1 = walletService.trade(builder.build());
+            val l1 = walletService.getLastLog(uid, currency);
+            val w1 = walletService.openWallet(uid, currency);
+
+            assertThat(t1.getAmount()).isEqualTo(5000000L);
+            assertThat(t1.isOutlay()).isTrue();
+
+            assertThat(l1).isNotNull();
+            assertThat(l1.getAmount()).isEqualTo(5000000L);
+            assertThat(l1.getPreBalance()).isEqualTo(1025000000L);
+            assertThat(l1.getBalance()).isEqualTo(1020000000L);
+            assertThat(l1.getPreFrozen()).isEqualTo(0);
+            assertThat(l1.getFrozen()).isEqualTo(5000000L);
+
+            assertThat(w1.getBalance()).isEqualTo(1020000000L);
+            assertThat(w1.getFrozen()).isEqualTo(5000000L);
+            assertThat(w1.getAmount()).isEqualTo(1025000000L);
+            assertThat(w1.getWithdrawal()).isEqualTo(1020000000L);
+            assertThat(w1.getOutlay()).isEqualTo(5000000L);
+
+            // when
+            val confirmed = walletService.confirm(t1.getId());
+            assertThat(confirmed).isTrue();
+            val l2 = walletService.getLastLog(uid, currency);
+            val w2 = walletService.openWallet(uid, currency);
+
+            assertThat(l2).isNotNull();
+            assertThat(l2.getAmount()).isEqualTo(5000000L);
+            assertThat(l2.getPreBalance()).isEqualTo(1020000000L);
+            assertThat(l2.getBalance()).isEqualTo(1020000000L);
+            assertThat(l2.getPreFrozen()).isEqualTo(5000000L);
+            assertThat(l2.getFrozen()).isEqualTo(0L);
+
+            assertThat(w2.getBalance()).isEqualTo(1020000000L);
+            assertThat(w2.getFrozen()).isEqualTo(0L);
+            assertThat(w2.getAmount()).isEqualTo(1020000000L);
+            assertThat(w2.getWithdrawal()).isEqualTo(1020000000L);
+            assertThat(w2.getOutlay()).isEqualTo(5000000L);
+        }
+    }
+
+    @Test
+    void unfreeze() {
+        // given
+        val uid = 1L;
+        val currency = "CNY";
+        val builder = TradeDTO.newBuilder();
+        builder.setUid(uid);
+        builder.setCurrency(currency);
+        builder.setBiz("test");
+        // 充值
+        {
+            builder.setAmount(10.25D);
+            builder.setBizSubject("deposit");
+            builder.setBizId("10000");
+            // when 充值
+            val trans = walletService.trade(builder.build());
+            val lastLog = walletService.getLastLog(uid, currency);
+            val wallet = walletService.openWallet(uid, currency);
+
+            // then
+            assertThat(trans).isNotNull();
+            assertThat(trans.getAmount()).isEqualTo(1025000000L);
+            assertThat(trans.isOutlay()).isFalse();
+
+            assertThat(lastLog).isNotNull();
+            assertThat(lastLog.getAmount()).isEqualTo(1025000000L);
+            assertThat(lastLog.getPreBalance()).isEqualTo(0L);
+            assertThat(lastLog.getBalance()).isEqualTo(1025000000L);
+            assertThat(lastLog.getPreFrozen()).isEqualTo(0);
+            assertThat(lastLog.getFrozen()).isEqualTo(0);
+
+            assertThat(wallet.getBalance()).isEqualTo(1025000000L);
+            assertThat(wallet.getFrozen()).isEqualTo(0L);
+            assertThat(wallet.getAmount()).isEqualTo(1025000000L);
+            assertThat(wallet.getWithdrawal()).isEqualTo(1025000000L);
+            assertThat(wallet.getOutlay()).isEqualTo(0L);
+        }
+        // 提现
+        {
+            // given
+            builder.setAmount(0.05D);
+            builder.setBizSubject("withdraw");
+            builder.setBizId("10001");
+            // when
+            val t1 = walletService.trade(builder.build());
+            val l1 = walletService.getLastLog(uid, currency);
+            val w1 = walletService.openWallet(uid, currency);
+
+            assertThat(t1.getAmount()).isEqualTo(5000000L);
+            assertThat(t1.isOutlay()).isTrue();
+
+            assertThat(l1).isNotNull();
+            assertThat(l1.getAmount()).isEqualTo(5000000L);
+            assertThat(l1.getPreBalance()).isEqualTo(1025000000L);
+            assertThat(l1.getBalance()).isEqualTo(1020000000L);
+            assertThat(l1.getPreFrozen()).isEqualTo(0);
+            assertThat(l1.getFrozen()).isEqualTo(5000000L);
+
+            assertThat(w1.getBalance()).isEqualTo(1020000000L);
+            assertThat(w1.getFrozen()).isEqualTo(5000000L);
+            assertThat(w1.getAmount()).isEqualTo(1025000000L);
+            assertThat(w1.getWithdrawal()).isEqualTo(1020000000L);
+            assertThat(w1.getOutlay()).isEqualTo(5000000L);
+        }
+
+        // 提现 - 提现完成
+        {
+            // given
+            builder.setAmount(1D);
+            builder.setBizSubject("withdraw");
+            builder.setBizId("10002");
+            // when
+            val t1 = walletService.trade(builder.build());
+            val l1 = walletService.getLastLog(uid, currency);
+            val w1 = walletService.openWallet(uid, currency);
+
+            assertThat(t1.getAmount()).isEqualTo(100000000L);
+            assertThat(t1.isOutlay()).isTrue();
+
+            assertThat(l1).isNotNull();
+            assertThat(l1.getAmount()).isEqualTo(100000000L);
+            assertThat(l1.getPreBalance()).isEqualTo(1020000000L);
+            assertThat(l1.getBalance()).isEqualTo(920000000L);
+            assertThat(l1.getPreFrozen()).isEqualTo(5000000L);
+            assertThat(l1.getFrozen()).isEqualTo(105000000L);
+
+            assertThat(w1.getBalance()).isEqualTo(920000000L);
+            assertThat(w1.getFrozen()).isEqualTo(105000000L);
+            assertThat(w1.getAmount()).isEqualTo(1025000000L);
+            assertThat(w1.getWithdrawal()).isEqualTo(920000000L);
+            assertThat(w1.getOutlay()).isEqualTo(105000000L);
+
+            // when
+            val confirmed = walletService.unfreeze(t1.getId());
+            assertThat(confirmed).isTrue();
+            val l2 = walletService.getLastLog(uid, currency);
+            val w2 = walletService.openWallet(uid, currency);
+
+            assertThat(l2).isNotNull();
+            assertThat(l2.getAmount()).isEqualTo(100000000L);
+            assertThat(l2.getPreBalance()).isEqualTo(920000000L);
+            assertThat(l2.getBalance()).isEqualTo(1020000000L);
+            assertThat(l2.getPreFrozen()).isEqualTo(105000000L);
+            assertThat(l2.getFrozen()).isEqualTo(5000000L);
+
+            assertThat(w2.getBalance()).isEqualTo(1020000000L);
+            assertThat(w2.getFrozen()).isEqualTo(5000000L);
+            assertThat(w2.getAmount()).isEqualTo(1025000000L);
+            assertThat(w2.getWithdrawal()).isEqualTo(1020000000L);
+            assertThat(w2.getOutlay()).isEqualTo(5000000L);
+        }
+    }
+
 }

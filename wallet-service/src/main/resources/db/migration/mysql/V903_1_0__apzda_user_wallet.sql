@@ -47,9 +47,9 @@ CREATE TABLE wallet_change_log
     block          VARCHAR(32)      NOT NULL COMMENT 'MD5值,区块地址(基于上一个交易的区块地址)',
     remark         TEXT             NULL     DEFAULT NULL COMMENT '说明',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `UDX_SSID` (`biz_subject`, `biz_id`),
+    UNIQUE KEY `UDX_SSID` (`biz`, `biz_subject`, `biz_id`),
     KEY `IDX_UID_OUT_EX` (`uid`, `currency`, `expired_at`),
-    UNIQUE KEY `UDX_TRANSACTION_ID` (transaction_id)
+    KEY `IDX_TRANSACTION_ID` (transaction_id)
 ) COMMENT '账户变更日志';
 
 CREATE TABLE wallet_transaction

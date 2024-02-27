@@ -45,7 +45,8 @@ public enum WalletError {
     INSUFFICIENT_BALANCE(90309,"balance is not enough"),
     INSUFFICIENT_BALANCE1(90310,"withdrawal is not enough"),
     EXPIRED_TIME_INVALID(90310,"expire time is invalid"),
-    OUTLAY_CANNOT_SAVE(90311,"outlay log cannot be saved")
+    OUTLAY_CANNOT_SAVE(90311,"outlay log cannot be saved"),
+    FROZEN_AMOUNT_INVALID(90312,"frozen amount is invalid")
     ;
     // @formatter:on
 
