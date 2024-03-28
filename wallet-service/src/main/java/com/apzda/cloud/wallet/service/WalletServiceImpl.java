@@ -49,7 +49,8 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public WalletDTO wallet(WalletDTO request) {
-        return null;
+        val builder = WalletDTO.getDefaultInstance();
+        return builder;
     }
 
 }

@@ -16,7 +16,7 @@
  */
 package com.apzda.cloud.wallet.config;
 
-import com.apzda.mybatis.plus.configure.MybatisCustomizer;
+import com.apzda.cloud.db.MybatisCustomizer;
 import lombok.val;
 import org.springframework.beans.BeansException;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
