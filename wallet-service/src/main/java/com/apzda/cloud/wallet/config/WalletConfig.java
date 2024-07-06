@@ -35,6 +35,7 @@ import java.util.Set;
  **/
 @Configuration
 @EnableConfigurationProperties(WalletProperties.class)
+@MapperScan(basePackages = { "com.apzda.cloud.wallet.domain.mapper" })
 public class WalletConfig implements ApplicationContextAware {
 
     private static WalletProperties properties;

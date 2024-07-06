@@ -17,11 +17,8 @@
 package com.apzda.cloud.wallet.server;
 
 import com.apzda.cloud.wallet.config.WalletConfig;
-import com.apzda.cloud.wallet.proto.WalletServiceGsvc;
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.PropertySource;
 
 import java.lang.annotation.*;
 
@@ -32,10 +29,8 @@ import java.lang.annotation.*;
  **/
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@PropertySource("classpath:apzda.wallet.service.properties")
-@Import({ WalletConfig.class, WalletServiceGsvc.class })
+@Import(WalletConfig.class)
 @ComponentScan(basePackages = { "com.apzda.cloud.wallet.**.service" })
-@MapperScan(basePackages = { "com.apzda.cloud.wallet.domain.mapper" })
 @Documented
 public @interface EnableWalletServer {
 
